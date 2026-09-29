@@ -1,0 +1,18 @@
+[Unit]
+Description=Dashboard fetcher_sen66.py
+#Wants=network-online.target
+#After=network-online.target
+Wants=dev-i2c-1.device
+After=dev-i2c-1.device
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/Luftqualitaet
+ExecStart=/home/pi/airdata-venv/bin/python -u /home/pi/Luftqualitaet/fetcher_sen66.py
+Restart=always
+RestartSec=60s
+KillSignal=SIGINT
+
+[Install]
+WantedBy=multi-user.target

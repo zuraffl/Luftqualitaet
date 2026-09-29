@@ -1,0 +1,17 @@
+[Unit]
+Description=Dashboard fetcher_uba.py
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/Luftqualitaet
+ExecStartPre=/bin/sleep 60
+ExecStart=/home/pi/airdata-venv/bin/python -u /home/pi/Luftqualitaet/fetcher_uba.py
+Restart=always
+RestartSec=60s
+KillSignal=SIGINT
+
+[Install]
+WantedBy=multi-user.target

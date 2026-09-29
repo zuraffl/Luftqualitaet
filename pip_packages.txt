@@ -1,0 +1,5 @@
+rpi-lgpio==0.6
+adafruit-circuitpython-sen6x
+adafruit-blinka
+schedule
+shapely

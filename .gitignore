@@ -1,0 +1,14 @@
+__pycache__/
+.ipynb_checkpoints/
+.venv/
+.airdata-venv/
+Messreihen/
+Logging_Files/*
+!Logging_Files/.gitkeep
+Support_Programs/
+
+.lgd-nfy0
+airdata.json
+
+*.pyc
+*.pyc
