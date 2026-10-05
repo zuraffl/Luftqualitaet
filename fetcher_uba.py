@@ -196,8 +196,11 @@ def data_update():
     # -- 4) JSON nur in der Kategorie UBA schreiben und alten Inhalt ersetzen
     airdata["uba"] = {"schadstoffe": results}
 
-    with open(JSON_PATH, "w", encoding="utf-8") as f:
+    #JSON als temporäre Datei schreiben, danach "airdata.json" in einem Stück ersetzen
+    tmp_path = JSON_PATH.with_suffix(".uba.tmp")
+    with open(tmp_path, "w", encoding="utf-8") as f:
         json.dump(airdata, f, indent=2, ensure_ascii=False)
+    tmp_path.replace(JSON_PATH)
 
 # --- main
 def main():

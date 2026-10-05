@@ -63,8 +63,11 @@ def data_update(sensor):
         #JSON nur in der Kategorie sensor schreiben und alten Inhalt ersetzen
         airdata["sensor"] = data
 
-        with open(JSON_PATH, "w", encoding="utf-8") as f:
+        #JSON als temporäre Datei schreiben, danach "airdata.json" in einem Stück ersetzen
+        tmp_path = JSON_PATH.with_suffix(".sen.tmp")
+        with open(tmp_path, "w", encoding="utf-8") as f:
             json.dump(airdata, f, indent=2)
+        tmp_path.replace(JSON_PATH)
 
 # --- main
 def main():
