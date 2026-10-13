@@ -6,7 +6,7 @@ Tobias Zurawski, Hochschule Anhalt, 2026
 
 ## Link zu detaillierter Dokumentation und CAD Dateien
 
-XXX
+https://magentacloud.de/s/yiyAzS4p7HNap8L
 
 ## Verwendete Hardware
 
@@ -119,7 +119,7 @@ sudo systemctl enable --now Dashboard.service Fetcher_SEN66.service Fetcher_UBA.
 
 Planmäßig sind im laufenden Betrieb keine Eingriffe nötig.
 
-Die gemessene Leistungsaufnahme beträgt 0,7 W. 
+Die gemessene Leistungsaufnahme beträgt 0,74 W. 
 
 Das Herunterfahren des Dashboards sollte über die Kommandozeile erfolgen, da das Display sonst einfriert.
 
