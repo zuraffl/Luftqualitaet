@@ -9,5 +9,6 @@ Support_Programs/
 
 .lgd-nfy0
 airdata.json
+airdata.*.tmp
 
 *.pyc
