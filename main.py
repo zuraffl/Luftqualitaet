@@ -17,11 +17,11 @@ import logging
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-from ePaper_Treiber import epd2in9_V2
+from epaper_driver import epd2in9_V2
 import schedule
 
 from config import CSV_LOGGING, CSV_LOGGING_INTERVAL, DISPLAY_INTERVAL
-from functions import convert_json_data, calculate_lqi_in, calculate_overall_index, calculate_trend, fresh_air_algorithm, csv_init, csv_append, sen_veraltet, uba_veraltet
+from functions import convert_json_data, calculate_lqi_in, calculate_overall_index, calculate_trend, fresh_air_algorithm, csv_init, csv_append, sen_outdated, uba_outdated
 from graphics import display_cleanup, draw_startup, draw_static_image, draw_dynamic_image
 
 # Verzeichnis des Codes
@@ -46,9 +46,9 @@ logging.basicConfig(
 counter_csv = counter_uba = counter_sen66 = counter_display = -1
 
 # Initialisierung des Bildformates
-Display = epd2in9_V2.EPD()
-Vertical_Image = Image.new('1', (Display.width, Display.height), 255) 
-draw = ImageDraw.Draw(Vertical_Image)
+display = epd2in9_V2.EPD()
+vertical_image = Image.new('1', (display.width, display.height), 255) 
+draw = ImageDraw.Draw(vertical_image)
 
 # Fonts
 fonts = {
@@ -61,7 +61,7 @@ fonts = {
 
 # Trendpfeile
 arrows = {
-    angle: Image.open(BASE_PATH / "Medien" / f"Arrow_{angle:03d}.png").convert("1")
+    angle: Image.open(BASE_PATH / "Media" / f"Arrow_{angle:03d}.png").convert("1")
     for angle in range(0, 181, 30)
 }
 
@@ -75,7 +75,7 @@ def safe_data_update(static_snapshot):
 # --- Im Fehlerfall wird der Full Refresh des Displays übersprungen statt Programmende
 def safe_draw_static():
     try:
-        draw_static_image(Display, Vertical_Image, draw, fonts) # in graphics.py
+        draw_static_image(display, vertical_image, draw, fonts) # in graphics.py
     except Exception:
         logging.exception("Display-Update der statischen Elemente übersprungen:")
 
@@ -88,17 +88,17 @@ def data_update(static_snapshot):
 
     # JSON-Daten abrufen und in dict konvertieren
     with open(BASE_PATH / "airdata.json", "r", encoding="utf-8") as f:
-        daten = json.load(f)
+        data = json.load(f)
 
-    data_in, data_out, lqi_out, lqi_out_float = convert_json_data(daten)
+    data_in, data_out, lqi_out, lqi_out_float = convert_json_data(data)
 
     # Prüfen, ob SEN66-Daten veraltet
-    veraltet, counter_sen66 = sen_veraltet(daten, counter_sen66)
-    if veraltet:
+    outdated_sen66, counter_sen66 = sen_outdated(data, counter_sen66)
+    if outdated_sen66:
         data_in = {k: None for k in data_in}
     # Prüfen, ob UBA-Daten veraltet
-    stale, counter_uba = uba_veraltet(daten, counter_uba)
-    for k in stale:
+    outdated_pollutants, counter_uba = uba_outdated(data, counter_uba)
+    for k in outdated_pollutants:
         data_out[k] = None
         lqi_out[k]  = None
         lqi_out_float[k] = None
@@ -106,7 +106,7 @@ def data_update(static_snapshot):
     # Berechnungen
     lqi_in, lqi_in_float = calculate_lqi_in(data_in)            # LQI innen
     overall = calculate_overall_index(lqi_out, lqi_in)          # Gesamt LQI außen und innen
-    trend = calculate_trend(lqi_out, daten)                     # Prognose außen
+    trend = calculate_trend(lqi_out, data)                      # Prognose außen
     fresh_air = fresh_air_algorithm(lqi_out_float, lqi_in_float)# Empfehlung zum Lüften
 
     # CSV Log mit Zähler (Standard alle 5 Minuten)
@@ -120,17 +120,17 @@ def data_update(static_snapshot):
     # Display Partial Update mit Zähler (Standard jede Minute)
     counter_display += 1
     if counter_display % DISPLAY_INTERVAL == 0:
-        Vertical_Image.paste(static_snapshot, (0, 0)) # dynamischen Bildteil auf den statischen Hintergrund zurücksetzen für partial refresh
+        vertical_image.paste(static_snapshot, (0, 0)) # dynamischen Bildteil auf den statischen Hintergrund zurücksetzen für partial refresh
         draw_dynamic_image(
-            Display, Vertical_Image, draw, fonts, data_out, data_in, lqi_out, lqi_in, overall, arrows, trend, fresh_air, time_now) # in graphics.py
+            display, vertical_image, draw, fonts, data_out, data_in, lqi_out, lqi_in, overall, arrows, trend, fresh_air, time_now) # in graphics.py
 
 # --- Zeitabhängiger Dateiname der CSV wird festgelegt
 # +++ erstellt mit KI-Hilfe
 def csv_file_name():
     present_month = datetime.now().strftime("%y%m")
-    CSV_PATH = BASE_PATH / "Logging_Files" / f"csv_log_{present_month}.csv"
-    csv_init(CSV_PATH)
-    return CSV_PATH
+    csv_path = BASE_PATH / "Logging_Files" / f"csv_log_{present_month}.csv"
+    csv_init(csv_path)
+    return csv_path
 
 # --- main
 def main():
@@ -138,14 +138,14 @@ def main():
 
     try:    
         # Display bereinigen und Startbildschirm
-        display_cleanup(Display)
+        display_cleanup(display)
         time.sleep(10)
-        draw_startup(Display, Vertical_Image, draw, fonts)
+        draw_startup(display, vertical_image, draw, fonts)
         time.sleep(10)
 
         # Fixierter Bildteil, dann dynamischer
-        draw_static_image(Display, Vertical_Image, draw, fonts)
-        static_snapshot = Vertical_Image.copy()   # statischen Hintergrund merken für partial refresh
+        draw_static_image(display, vertical_image, draw, fonts)
+        static_snapshot = vertical_image.copy()   # statischen Hintergrund merken für partial refresh
         safe_data_update(static_snapshot)
 
         # Schedule
@@ -164,9 +164,9 @@ def main():
 
     finally:
         try:
-            Display.init()
-            Display.Clear()
-            Display.sleep()
+            display.init()
+            display.Clear()
+            display.sleep()
         # falls Display nicht ansprechbar
         except Exception:
             logging.exception("Display Clear nicht möglich.")

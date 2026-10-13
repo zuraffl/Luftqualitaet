@@ -26,15 +26,15 @@ ROW_7 = round(0.8 * ROW_SPACE + ROW_6)
 MID_COLUMN = 64
 
 # --- Bereinigen des Displays bei Systemstart
-def display_cleanup(Display):
-    Display.init() # ePaper ggf. aufwecken
-    Display.Clear() # ePaper bereinigen
+def display_cleanup(display):
+    display.init() # ePaper ggf. aufwecken
+    display.Clear() # ePaper bereinigen
 
 # --- Startbildschirm
-def draw_startup(Display, Vertical_Image, draw, fonts):
-    Display.init() # ePaper ggf. aufwecken
-    Display.Clear() # ePaper bereinigen
-    draw.rectangle((0, 0, Display.width, Display.height), fill=255) # PIL bereinigen
+def draw_startup(display, vertical_image, draw, fonts):
+    display.init() # ePaper ggf. aufwecken
+    display.Clear() # ePaper bereinigen
+    draw.rectangle((0, 0, display.width, display.height), fill=255) # PIL bereinigen
     text = (
         f'git:\nzuraffl\n/Luftqualitaet\n\n'
         f'Anzeige-\nintervall\n{DISPLAY_INTERVAL} min\n'
@@ -47,14 +47,14 @@ def draw_startup(Display, Vertical_Image, draw, fonts):
         text,
         font=fonts['f16'], fill=0, anchor='ma', align='center'
     )
-    Display.display_Base(Display.getbuffer(Vertical_Image)) # Darstellen
+    display.display_Base(display.getbuffer(vertical_image)) # Darstellen
 
 # --- Feste Bildelemente mit Übergabe von Bildformat und Fonts aus main
-def draw_static_image(Display, Vertical_Image, draw, fonts):
+def draw_static_image(display, vertical_image, draw, fonts):
 
-    Display.init() # ePaper ggf. aufwecken
-    Display.Clear() # ePaper bereinigen
-    draw.rectangle((0, 0, Display.width, Display.height), fill=255) # PIL bereinigen
+    display.init() # ePaper ggf. aufwecken
+    display.Clear() # ePaper bereinigen
+    draw.rectangle((0, 0, display.width, display.height), fill=255) # PIL bereinigen
 
     #Horizontale Linien
     draw.line((0, ROW_1, 127, ROW_1), fill = 0, width = 2)
@@ -87,10 +87,10 @@ def draw_static_image(Display, Vertical_Image, draw, fonts):
     draw.text((MID_COLUMN-2, ROW_5), 'SO₂', font = fonts['f16'], fill = 0, anchor='ra')
     draw.text((MID_COLUMN+4, ROW_5), 'CO₂', font = fonts['f16'], fill = 0, anchor='la')
 
-    Display.display_Base(Display.getbuffer(Vertical_Image)) # Full Refresh
+    display.display_Base(display.getbuffer(vertical_image)) # Full Refresh
 
 # --- Aktualisierung dynamischer Bildelemente
-def draw_dynamic_image(Display, Vertical_Image, draw, fonts, data_out, data_in, lqi_out, lqi_in, overall, arrows, trend, fresh_air, time_now):
+def draw_dynamic_image(display, vertical_image, draw, fonts, data_out, data_in, lqi_out, lqi_in, overall, arrows, trend, fresh_air, time_now):
     # Gesamtqualität
     draw.multiline_text((MID_COLUMN-32, ROW_1), f"{overall['overall_out']}", font = fonts['f16'], fill = 0, anchor = 'md', align = 'center',spacing = 2)
     draw.multiline_text((MID_COLUMN+32, ROW_1), f"{overall['overall_in']}", font = fonts['f16'], fill = 0, anchor = 'md', align = 'center',spacing = 2)
@@ -125,13 +125,13 @@ def draw_dynamic_image(Display, Vertical_Image, draw, fonts, data_out, data_in, 
 
     # Trendpfeile außen
     if trend["PM2_5"] is not None:
-        Vertical_Image.paste(arrows[trend["PM2_5"]], (MID_COLUMN-50, ROW_1+3))
+        vertical_image.paste(arrows[trend["PM2_5"]], (MID_COLUMN-50, ROW_1+3))
     if trend["PM10"] is not None:
-        Vertical_Image.paste(arrows[trend["PM10"]] , (MID_COLUMN-50,ROW_2+3))
+        vertical_image.paste(arrows[trend["PM10"]] , (MID_COLUMN-50,ROW_2+3))
     if trend["NO2"] is not None:
-        Vertical_Image.paste(arrows[trend["NO2"]] , (MID_COLUMN-50,ROW_3+3))
+        vertical_image.paste(arrows[trend["NO2"]] , (MID_COLUMN-50,ROW_3+3))
     if trend["O3"] is not None:   
-        Vertical_Image.paste(arrows[trend["O3"]] , (MID_COLUMN-50,ROW_4+3)) 
+        vertical_image.paste(arrows[trend["O3"]] , (MID_COLUMN-50,ROW_4+3)) 
 
     # Lüftempfehlung
     draw.text((MID_COLUMN, (ROW_6+ROW_7)/2), fresh_air if fresh_air is not None else "-", font = fonts['fNB16'], fill = 0, anchor='mm')
@@ -161,14 +161,14 @@ def draw_dynamic_image(Display, Vertical_Image, draw, fonts, data_out, data_in, 
     #Die bereits geschriebenen Zellen werden invertiert
     for value, box_invert, box_part_invert in boxes:
         if value in (3, 4):
-            Vertical_Image.paste(ImageChops.invert(Vertical_Image.crop(box_invert)), box_invert)
+            vertical_image.paste(ImageChops.invert(vertical_image.crop(box_invert)), box_invert)
         elif value == 2:
-            Vertical_Image.paste(ImageChops.invert(Vertical_Image.crop(box_part_invert)), box_part_invert)
+            vertical_image.paste(ImageChops.invert(vertical_image.crop(box_part_invert)), box_part_invert)
 
     #Invertierung der Lüftungsempfehlung bei dringender Empfehlung
     fresh_air_box = (0, ROW_6+2, 128, ROW_7)
 
     if fresh_air in ("Dringend lüften!", "Nicht lüften!", "Stoßlüften!"):
-        Vertical_Image.paste(ImageChops.invert(Vertical_Image.crop(fresh_air_box)), fresh_air_box)
+        vertical_image.paste(ImageChops.invert(vertical_image.crop(fresh_air_box)), fresh_air_box)
 
-    Display.display_Partial(Display.getbuffer(Vertical_Image)) # Partial Refresh
+    display.display_Partial(display.getbuffer(vertical_image)) # Partial Refresh

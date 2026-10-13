@@ -51,7 +51,7 @@ def data_update(sensor):
     if sensor.data_ready:
         #Datenabruf
         data = sensor.all_measurements()
-        data["zeit"] = time.time() #fügt den Messwerten aktuelle Zeit hinzu
+        data["time"] = time.time() #fügt den Messwerten aktuelle Zeit hinzu
 
         # aktuellen Stand der JSON laden, um komplettes Überschreiben zu verhindern
         try:

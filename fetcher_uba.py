@@ -70,7 +70,7 @@ FORECAST_POLLUTANTS = {
 }
 
 # Definition fehlender Werte
-EMPTY = {"zeit": None, "wert": None, "lqi": None, "lqi_float": None}
+EMPTY = {"time": None, "value": None, "lqi": None, "lqi_float": None}
 
 # --- Hilfsfunktion Abruf aller benötigten Stationen
 # +++ erstellt mit KI-Hilfe
@@ -96,7 +96,7 @@ def fetch_stations(url, params, pollutants):
 # grenze bereits vor, einzelne Komponenten fehlen darin aber noch.
 # Der Schlüssel der Zeitreihe ist der Beginn der Messstunde, Position 0 des
 # Eintrags ihr Ende ("date end" nach UBA-Konvention). Zurückgegeben wird das
-# Ende, weil uba_veraltet() in functions.py damit das Alter prüft. Die
+# Ende, weil uba_outdated() in functions.py damit das Alter prüft. Die
 # Sortierung über den Schlüssel bleibt gültig, weil Beginn und Ende dieselbe
 # Reihenfolge ergeben.
 def latest_value(series, comp_id):
@@ -110,8 +110,8 @@ def latest_value(series, comp_id):
                     lqi_float = float(str(component[3]).replace(",", "."))
                 except (IndexError, ValueError):
                     lqi_float = None   # bei fehlendem oder fehlerhaftem Wert None zurückgeben
-                return {"zeit": entry[0],        # Position 0: Zeitstempel Ende der Messung
-                        "wert": component[1],    # Position 1: Messwert
+                return {"time": entry[0],        # Position 0: Zeitstempel Ende der Messung
+                        "value": component[1],   # Position 1: Messwert
                         "lqi":  component[2],    # Position 2: Index als int
                         "lqi_float": lqi_float}  # Position 3: Index als float
     return dict(EMPTY)
@@ -175,11 +175,11 @@ def data_update():
             airdata = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
         airdata = {}
-    previous = airdata.get("uba", {}).get("schadstoffe", {})
+    previous = airdata.get("uba", {}).get("pollutants", {})
 
     for name, entry in results.items():
         #Prüfen, ob aktuelles Ergebnis leer und vorheriges Ergebnis nicht leer
-        if entry["wert"] is None and previous.get(name, {}).get("wert") is not None:
+        if entry["value"] is None and previous.get(name, {}).get("value") is not None:
             results[name] = dict(previous[name])
 
     # -- 3) Abruf Prognosedaten
@@ -191,10 +191,10 @@ def data_update():
 
     # Prognose in Ergebnisse übertragen, ohne Prognose (SO2) wird None eingetragen
     for name in results:
-        results[name]["Prognose"] = forecasts.get(name)
+        results[name]["forecast"] = forecasts.get(name)
 
     # -- 4) JSON nur in der Kategorie UBA schreiben und alten Inhalt ersetzen
-    airdata["uba"] = {"schadstoffe": results}
+    airdata["uba"] = {"pollutants": results}
 
     #JSON als temporäre Datei schreiben, danach "airdata.json" in einem Stück ersetzen
     tmp_path = JSON_PATH.with_suffix(".uba.tmp")

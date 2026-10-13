@@ -2,7 +2,7 @@
 
 Tobias Zurawski, Hochschule Anhalt, 2026
 
-<img src="Medien/Dashboard.jpg" alt="Dashboard" width="400">
+<img src="Media/Dashboard.jpg" alt="Dashboard" width="400">
 
 ## Link zu detaillierter Dokumentation und CAD Dateien
 
