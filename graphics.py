@@ -8,9 +8,7 @@ Inhalt
 * Zeichnen statischer Anzeigeelemente (v. a. Geometrie)
 * Zeichnen dynamischer Anzeigeelemente (Werte) und ggf. Invertierung
 """
-from PIL import Image, ImageDraw, ImageChops
-
-import logging
+from PIL import ImageChops
 
 from config import DISPLAY_INTERVAL, STATION, STATION_O3, STATION_SO2
 
