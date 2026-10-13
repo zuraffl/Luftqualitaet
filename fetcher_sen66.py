@@ -90,7 +90,7 @@ def main():
             schedule.run_pending()
             time.sleep(1) 
 
-    except Exception as e:
+    except Exception:
         logging.exception("Fehler:")
     
     except KeyboardInterrupt:
