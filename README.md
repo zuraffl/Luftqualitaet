@@ -140,10 +140,10 @@ CSV-Logging ist in `config.py` deaktivierbar und legt monatlich eine neue Datei 
 
 ## Lizenz
 
-Dieses Projekt steht unter der GNU General Public License v3.0, siehe [LICENSE](LICENSE).
+Dieses Projekt steht unter der GNU General Public License v3.0, siehe [LICENSE](LICENSE). Die unter Bestandteile Dritter genannten Komponenten behalten ihre jeweiligen Lizenzen.
 
 ## Bestandteile Dritter
 
-- Font: Roboto von Google, Apache License 2.0
+- Font: Roboto von Google, Apache License 2.0 – siehe [Fonts/LICENSE.txt](Fonts/LICENSE.txt)
 - Display-Treiber: Waveshare, MIT-Lizenz
 - API-Daten: Umweltbundesamt mit Daten der Messnetze der Länder und des Bundes
