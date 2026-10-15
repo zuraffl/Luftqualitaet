@@ -1,7 +1,7 @@
 """
 Fetcher für die Luftdaten des Umweltbundesamtes via REST-API.
-Dokumentation des UBA: 
-http://www.uba.de/m99517de 
+Dokumentation des UBA:
+http://www.uba.de/m99517de
 https://luftdaten.umweltbundesamt.de/api/air-data/v4/doc
 
 Die API-Abfrage liefert die Daten ganzjährig in MEZ, die Abfrage arbeitet daher
@@ -28,15 +28,19 @@ import schedule
 
 from config import STATION, STATION_O3, STATION_SO2, UBA_TIMEOUT
 
-#Logger mit Rotating File Handler
+# Verzeichnis des Codes
+BASE_PATH = Path(__file__).parent
+
+# Logger mit Rotating File Handler
+(BASE_PATH / "Logging_Files").mkdir(parents=True, exist_ok=True)
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(filename)s - %(message)s",
     handlers=[
         RotatingFileHandler(
-            "Logging_Files/Logger_uba.log",
-            maxBytes=1_000_000,   #maximal 1 MB pro Log-Datei
-            backupCount=10,       #10 Logs werden archiviert
+            BASE_PATH / "Logging_Files/Logger_uba.log",
+            maxBytes=1_000_000,   # maximal ~1 MB pro Log-Datei
+            backupCount=10,       # 10 Logs werden archiviert
             encoding="utf-8",
         )
     ],
@@ -47,12 +51,12 @@ URL_CURRENT = "https://luftdaten.umweltbundesamt.de/api/air-data/v4/airquality/j
 URL_FORECAST = "https://luftdaten.umweltbundesamt.de/api/air-data/v4/airqualityforecast/json"
 
 # JSON im gleichen Verzeichnis
-JSON_PATH = Path(__file__).parent / "airdata.json"
+JSON_PATH = BASE_PATH / "airdata.json"
 
 # Abfragezeitraum mit 2h Puffer zu UBA_TIMEOUT in config.py, damit nach einem Ausfall wieder aufgeholt wird.
 WINDOW_HOURS = UBA_TIMEOUT + 2
 
-#Zuordnung der einzelnen Schadstoffe zu Stations-ID und Schadstoff-ID laut UBA-Dokumentation
+# Zuordnung der einzelnen Schadstoffe zu Stations-ID und Schadstoff-ID laut UBA-Dokumentation
 POLLUTANTS = {
     "PM2_5": (STATION,     9),
     "PM10":  (STATION,     1),
@@ -178,7 +182,7 @@ def data_update():
     previous = airdata.get("uba", {}).get("pollutants", {})
 
     for name, entry in results.items():
-        #Prüfen, ob aktuelles Ergebnis leer und vorheriges Ergebnis nicht leer
+        # Prüfen, ob aktuelles Ergebnis leer und vorheriges Ergebnis nicht leer
         if entry["value"] is None and previous.get(name, {}).get("value") is not None:
             results[name] = dict(previous[name])
 
@@ -196,7 +200,7 @@ def data_update():
     # -- 4) JSON nur in der Kategorie UBA schreiben und alten Inhalt ersetzen
     airdata["uba"] = {"pollutants": results}
 
-    #JSON als temporäre Datei schreiben, danach "airdata.json" in einem Stück ersetzen
+    # JSON als temporäre Datei schreiben, danach "airdata.json" in einem Stück ersetzen
     tmp_path = JSON_PATH.with_suffix(".uba.tmp")
     with open(tmp_path, "w", encoding="utf-8") as f:
         json.dump(airdata, f, indent=2, ensure_ascii=False)
@@ -213,6 +217,7 @@ def main():
         # API-Update zum Schedule
         schedule.every(10).minutes.at(":46").do(safe_data_update)
 
+        # Schedule-Schleife
         while True:
             schedule.run_pending()
             time.sleep(1)

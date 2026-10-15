@@ -1,5 +1,7 @@
 """
-Main Code
+Hauptskript
+Organisiert Datenabruf und Aktualisierung des Dashboards über Scheduler.
+Funktionen und grafische Darstellung sind ausgelagert in functions.py und graphics.py
 
 Inhalt:
 * Initialisierung von Display, Fonts, Trendpfeilen etc.
@@ -21,7 +23,8 @@ from epaper_driver import epd2in9_V2
 import schedule
 
 from config import CSV_LOGGING, CSV_LOGGING_INTERVAL, DISPLAY_INTERVAL
-from functions import convert_json_data, calculate_lqi_in, calculate_overall_index, calculate_trend, fresh_air_algorithm, csv_init, csv_append, sen_outdated, uba_outdated
+from functions import (convert_json_data, calculate_lqi_in, calculate_overall_index,
+    calculate_trend, fresh_air_algorithm, csv_init, csv_append, sen_outdated, uba_outdated)
 from graphics import display_cleanup, draw_startup, draw_static_image, draw_dynamic_image
 
 # Verzeichnis des Codes
@@ -35,8 +38,8 @@ logging.basicConfig(
     handlers=[
         RotatingFileHandler(
             BASE_PATH / "Logging_Files/Logger_main.log",
-            maxBytes=1_000_000,   # ca. 1MB Maximalgröße
-            backupCount=10,       # Archiv der zehn letzten Logs
+            maxBytes=1_000_000,   # maximal ~1 MB pro Log-Datei
+            backupCount=10,       # 10 Logs werden archiviert
             encoding="utf-8",
         )
     ],
@@ -47,7 +50,7 @@ counter_csv = counter_uba = counter_sen66 = counter_display = -1
 
 # Initialisierung des Bildformates
 display = epd2in9_V2.EPD()
-vertical_image = Image.new('1', (display.width, display.height), 255) 
+vertical_image = Image.new('1', (display.width, display.height), 255)
 draw = ImageDraw.Draw(vertical_image)
 
 # Fonts
@@ -83,19 +86,21 @@ def safe_draw_static():
 def data_update(static_snapshot):
     global counter_csv, counter_uba, counter_sen66, counter_display
 
-    # Uhrzeit
+    # Uhrzeit abrufen
     time_now = time.strftime("%H:%M", time.localtime())
 
     # JSON-Daten abrufen und in dict konvertieren
     with open(BASE_PATH / "airdata.json", "r", encoding="utf-8") as f:
         data = json.load(f)
 
+    # JSON-Daten in dicts kategorisieren
     data_in, data_out, lqi_out, lqi_out_float = convert_json_data(data)
 
     # Prüfen, ob SEN66-Daten veraltet
     outdated_sen66, counter_sen66 = sen_outdated(data, counter_sen66)
     if outdated_sen66:
         data_in = {k: None for k in data_in}
+
     # Prüfen, ob UBA-Daten veraltet
     outdated_pollutants, counter_uba = uba_outdated(data, counter_uba)
     for k in outdated_pollutants:
@@ -114,29 +119,32 @@ def data_update(static_snapshot):
     if CSV_LOGGING:
         counter_csv += 1
         if counter_csv % CSV_LOGGING_INTERVAL == 0:
-            dashboard_data = [data_in, data_out, lqi_out, lqi_in, overall, trend, fresh_air, time_now, lqi_out_float, lqi_in_float]
-            csv_append(csv_file_name(), dashboard_data)
+            dashboard_data = [data_in, data_out, lqi_out, lqi_in, overall, trend,
+                fresh_air, time_now, lqi_out_float, lqi_in_float]
+            csv_append(csv_file_name(), dashboard_data) # Funktion zum Schreiben neuer Zeile aufrufen
 
     # Display Partial Update mit Zähler (Standard jede Minute)
     counter_display += 1
     if counter_display % DISPLAY_INTERVAL == 0:
-        vertical_image.paste(static_snapshot, (0, 0)) # dynamischen Bildteil auf den statischen Hintergrund zurücksetzen für partial refresh
+        # dynamischen Bildteil auf den statischen Hintergrund zurücksetzen für partial refresh
+        vertical_image.paste(static_snapshot, (0, 0))
         draw_dynamic_image(
-            display, vertical_image, draw, fonts, data_out, data_in, lqi_out, lqi_in, overall, arrows, trend, fresh_air, time_now) # in graphics.py
+            display, vertical_image, draw, fonts, data_out, data_in, lqi_out, lqi_in,
+            overall, arrows, trend, fresh_air, time_now) # in graphics.py
 
 # --- Zeitabhängiger Dateiname der CSV wird festgelegt
 # +++ erstellt mit KI-Hilfe
 def csv_file_name():
     present_month = datetime.now().strftime("%y%m")
     csv_path = BASE_PATH / "Logging_Files" / f"csv_log_{present_month}.csv"
-    csv_init(csv_path)
+    csv_init(csv_path) # Funktion zur Prüfung, ob CSV vorhanden, sonst neu anlegen
     return csv_path
 
 # --- main
 def main():
     logging.info("Programm gestartet")
 
-    try:    
+    try:
         # Display bereinigen und Startbildschirm
         display_cleanup(display)
         time.sleep(10)
@@ -149,21 +157,25 @@ def main():
         safe_data_update(static_snapshot)
 
         # Schedule
+        # Partial Refresh des Displays mit aktuellen Werten und CSV-Logging
         schedule.every().minute.at(":00").do(safe_data_update, static_snapshot)
-        schedule.every().hour.at("59:49").do(safe_draw_static) #Full refresh, muss vor Partial Update um :00 fertig sein
+        # Stündlicher Full Refresh des Displays, muss vor Partial Refresh um :00 abgeschlossen sein
+        schedule.every().hour.at("59:49").do(safe_draw_static)
 
+        # Schedule-Schleife
         while True:
             schedule.run_pending()
             time.sleep(1)
 
     except Exception:
         logging.exception("Fehler:")
-    
+
     except KeyboardInterrupt:
         logging.info("Strg + C")
 
     finally:
         try:
+            # Bei Programmende Display bereinigen
             display.init()
             display.Clear()
             display.sleep()

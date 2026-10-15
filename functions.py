@@ -22,24 +22,26 @@ from shapely.geometry import Point, Polygon
 
 from config import SEN66_TIMEOUT, PM2_5_FACTOR, PM10_FACTOR, UBA_TIMEOUT, FORECAST_FROM, FORECAST_TO
 
-#UBA-JSON ist immer in Winterzeit (MEZ/CET), die Zeit der UBA-Werte wird im Code daher auf UTC+1 (= MEZ) festgelegt
+# UBA-JSON ist immer in Winterzeit (MEZ/CET), die Zeit der UBA-Werte wird im Code daher auf UTC+1 (= MEZ) festgelegt
 CET = timezone(timedelta(hours=1))
 
-# --- json Daten in dict konvertieren
+# --- JSON-Daten in kategorisierte dicts konvertieren
 def convert_json_data(data):
 
-    #Korrekturfunktion für Feinstaubwerte
+    # Korrekturfunktion für Feinstaubwerte
     def correction(raw_value, factor):
         return round(raw_value * factor, 1) if raw_value is not None else None
 
+    # Zugriff auf beide Kategorien der JSON
     values_in = data.get("sensor", {})
     values_out = data.get("uba", {}).get("pollutants", {})
 
+    # Messwerte innen
     data_in = {
-        "PM2_5_raw":    values_in.get("pm2_5"), # unkorrigiert
-        "PM10_raw":     values_in.get("pm10"), # unkorrigiert
-        "PM2_5":        correction(values_in.get("pm2_5"), PM2_5_FACTOR), # korrigiert
-        "PM10":         correction(values_in.get("pm10"),  PM10_FACTOR), # korrigiert
+        "PM2_5_raw":    values_in.get("pm2_5"),                             # unkorrigiert
+        "PM10_raw":     values_in.get("pm10"),                              # unkorrigiert
+        "PM2_5":        correction(values_in.get("pm2_5"), PM2_5_FACTOR),   # korrigiert
+        "PM10":         correction(values_in.get("pm10"),  PM10_FACTOR),    # korrigiert
         "NOx":          values_in.get("nox_index"),
         "VOC":          values_in.get("voc_index"),
         "CO2":          values_in.get("co2"),
@@ -47,6 +49,7 @@ def convert_json_data(data):
         "Humidity":     values_in.get("humidity"),
     }
 
+    # Messwerte außen
     data_out = {
         "PM2_5":    values_out.get("PM2_5", {}).get("value"),
         "PM10":     values_out.get("PM10", {}).get("value"),
@@ -55,6 +58,7 @@ def convert_json_data(data):
         "O3":       values_out.get("O3", {}).get("value"),
     }
 
+    # Luftqualitätsindizes außen als int
     lqi_out = {
         "PM2_5":    values_out.get("PM2_5", {}).get("lqi"),
         "PM10":     values_out.get("PM10", {}).get("lqi"),
@@ -63,6 +67,7 @@ def convert_json_data(data):
         "O3":       values_out.get("O3", {}).get("lqi"),
     }
 
+    # Luftqualitätsindizes außen als float
     lqi_out_float = {
         "PM2_5":    values_out.get("PM2_5", {}).get("lqi_float"),
         "PM10":     values_out.get("PM10", {}).get("lqi_float"),
@@ -71,15 +76,20 @@ def convert_json_data(data):
         "O3":       values_out.get("O3", {}).get("lqi_float"),
     }
 
+    # Rückgabe der dicts an main
     return data_in, data_out, lqi_out, lqi_out_float
 
 # --- Prüfen des Alters der SEN66-Daten
 def sen_outdated(data, counter_sen66):
+
+    # Zeitstempel abrufen
     sensor_time = data.get("sensor", {}).get("time")
-    # Kriterien: Zeitstempel nicht vorhanden oder Datenalter über gesetztem Limit
+
+    # Ausschluss-Kriterien: Zeitstempel nicht vorhanden oder Datenalter über gesetztem Limit
     outdated_sen66 = sensor_time is None or time.time() - sensor_time > SEN66_TIMEOUT * 60
+
+    # Zähler: um Überfüllung des Logs zu vermeiden ein Eintrag pro Stunde
     if outdated_sen66:
-        # Zähler: um Überfüllung des Logs zu vermeiden ein Eintrag pro Stunde
         counter_sen66 += 1
         if counter_sen66 == 60:
             counter_sen66 = 0
@@ -87,30 +97,38 @@ def sen_outdated(data, counter_sen66):
             logging.warning("SEN66-Daten veraltet")
     else:
         counter_sen66 = -1
+
+    # Rückgabe ob veraltet und Zählerstand an main
     return outdated_sen66, counter_sen66
 
 # --- Prüfen des Alters der UBA-Daten
 # +++ erstellt mit KI-Hilfe
 def uba_outdated(data, counter_uba):
+
+    # UBA-Daten abrufen und in MEZ betrachten, Set veralteter Werte definieren
     pollutants = data.get("uba", {}).get("pollutants", {})
     now = datetime.now(CET)
     outdated_pollutants = set()
+
+    # Prüfschleife
     for name, entry in pollutants.items():
         time_str = entry.get("time")
         if not time_str:
-            outdated_pollutants.add(name); continue
+            outdated_pollutants.add(name); continue         # kein Zeitstempel -> Wert veraltet
         try:
-            if " 24:" in time_str:                 # UBA-Konvention: 24:00 = Tagesende
+            # UBA-Konvention: 24:00 = Tagesende
+            if " 24:" in time_str:
                 timestamp = datetime.strptime(time_str[:10], "%Y-%m-%d") + timedelta(days=1)
             else:
                 timestamp = datetime.strptime(time_str, "%Y-%m-%d %H:%M:%S")
             timestamp = timestamp.replace(tzinfo=CET)
         except ValueError:
-            outdated_pollutants.add(name); continue               # unparsbar -> sicherheitshalber veraltet
+            outdated_pollutants.add(name); continue         # unparsbar -> Wert veraltet
         if now - timestamp > timedelta(hours=UBA_TIMEOUT):
-            outdated_pollutants.add(name)
+            outdated_pollutants.add(name)                   # Zeitstempel über gesetztem Limit -> Wert veraltet
+
+    # Zähler: um Überfüllung des Logs zu vermeiden ein Eintrag pro Stunde
     if outdated_pollutants:
-        # Zähler: um Überfüllung des Logs zu vermeiden ein Eintrag pro Stunde
         counter_uba += 1
         if counter_uba == 60:
             counter_uba = 0
@@ -118,11 +136,14 @@ def uba_outdated(data, counter_uba):
             logging.warning("UBA veraltet: %s", ", ".join(sorted(outdated_pollutants)))
     else:
         counter_uba = -1
+
+    # Rückgabe veralteter Messgrößen und Zählerstand an main
     return outdated_pollutants, counter_uba
 
 # --- LQI im Innenbereich ermitteln
 def calculate_lqi_in(data_in):
 
+    # Festlegung der Grenzwerte
     border_values = {
         "PM2_5": [0, 5, 15, 30, 50, 70],
         "PM10": [0, 9, 27, 54, 90, 126],
@@ -131,9 +152,10 @@ def calculate_lqi_in(data_in):
         "CO2": [400, 800, 1000, 1400, 2000, 2600],
     }
 
-    lqi_in = {}
-    lqi_in_float = {}
+    lqi_in = {}         # dict für int
+    lqi_in_float = {}   # dict für float
 
+    # Schleife zur Bestimmung pro Messgröße
     # +++ erstellt mit KI-Hilfe
     for pollutant, borders in border_values.items():
         value = data_in.get(pollutant)
@@ -154,22 +176,23 @@ def calculate_lqi_in(data_in):
         lqi_in_float[pollutant] = min(i + (value - borders[i]) / (borders[i + 1] - borders[i]), 5.0)
         lqi_in[pollutant] = i
 
+    # Rückgabe als dict an main
     return lqi_in, lqi_in_float
 
-#Gesamt-Index für Innen- und Außenbereich ermitteln
+# --- Gesamt-Index für Innen- und Außenbereich ermitteln
 def calculate_overall_index(lqi_out, lqi_in):
 
-    # Schlechtester Einzelwert außen
-    valid_out = [v for v in lqi_out.values() if v is not None]       # ungültige Werte filtern
-    worst_out = max(valid_out) if len(valid_out) >= 2 else None      # mindestens zwei gültige Werte
+    # Schlechtester Einzelwert außen und innen
+    valid_out = [v for v in lqi_out.values()
+                if v is not None]                               # ungültige Werte filtern
+    worst_out = max(valid_out) if len(valid_out) >= 2 else None # mindestens zwei gültige Werte
 
-    # Schlechtester Einzelwert innen
     valid_in = [v for k, v in lqi_in.items()
-                if k != "PM10"                                       # PM10 vom Gesamtindex ausgeschlossen
-                and v is not None]                                   # ungültige Werte filtern
-    worst_in = max(valid_in) if len(valid_in) >= 2 else None         # mindestens zwei gültige Werte
+                if k != "PM10"                                  # PM10 vom Gesamtindex ausgeschlossen
+                and v is not None]                              # ungültige Werte filtern
+    worst_in = max(valid_in) if len(valid_in) >= 2 else None    # mindestens zwei gültige Werte
 
-    # Gesamtindex ableiten, als string und int
+    # Gesamtindex außen und innen ableiten, als string und int
     if worst_out is None:   index_out, index_out_no = "-", None
     elif worst_out == 0:    index_out, index_out_no = "sehr\ngut", 0
     elif worst_out == 1:    index_out, index_out_no = "gut", 1
@@ -184,6 +207,7 @@ def calculate_overall_index(lqi_out, lqi_in):
     elif worst_in == 3:     index_in, index_in_no = "schlecht", 3
     else:                   index_in, index_in_no = "sehr\nschlecht", 4
 
+    # Rückgabe als dict an main
     return {
         "overall_out": index_out,
         "overall_in": index_in,
@@ -191,7 +215,7 @@ def calculate_overall_index(lqi_out, lqi_in):
         "overall_in_no": index_in_no,
     }
 
-#Trendpfeile zur Luftqualität berechnen
+# --- Trendpfeile zur Luftqualität berechnen
 def calculate_trend(lqi_out, data):
 
     # Prognosefenster mit Daten aus config.py eingrenzen
@@ -199,19 +223,19 @@ def calculate_trend(lqi_out, data):
     window_start = (now + timedelta(hours=FORECAST_FROM)).strftime("%Y-%m-%d %H:%M:%S")
     window_end   = (now + timedelta(hours=FORECAST_TO)).strftime("%Y-%m-%d %H:%M:%S")
 
-    #schlechtester Prognose-Index im Zeitfenster je Schadstoff
+    # schlechtester Prognose-Index im Zeitfenster je Schadstoff
     def worst_forecast(series):
-        #Prüfen, ob Prognosereihe vorhanden
+        # Prüfen, ob Prognosereihe vorhanden
         if not series:
             return None
         indices = [index for timestamp, index in series
                    if window_start <= timestamp <= window_end]   # Intervall eingrenzen
-        #Prüfen, ob Indizes vorhanden
+        # Prüfen, ob Indizes vorhanden
         if not indices:
             return None
         return max(indices)                                      # Maximalwert (schlechtester Index im Zeitfenster)
 
-    #Trend (Prognose − aktuell) in einen Pfeilwinkel übersetzen
+    # Trend (Prognose − aktuell) in einen Pfeilwinkel übersetzen
     def trend_to_angle(current, forecast):
         if current is None or forecast is None:
             return None                     # kein Pfeil ohne beide Werte
@@ -222,7 +246,7 @@ def calculate_trend(lqi_out, data):
             return 0                        # maximale Auslenkung nach oben
         return 90 - trend * 30              # alle anderen Fälle: Zwischenstellungen je 30° berechnen
 
-    #je Schadstoff aktuellen Index mit Worst-Case-Prognose vergleichen
+    # je Schadstoff aktuellen Index mit Worst-Case-Prognose vergleichen
     pollutants = data.get("uba", {}).get("pollutants", {})
     trend_arrows = {}
     for name in ("PM2_5", "PM10", "NO2", "O3"):
@@ -231,10 +255,10 @@ def calculate_trend(lqi_out, data):
 
     return trend_arrows
 
-#Lüftungsempfehlung
+# --- Lüftungsempfehlung
 def fresh_air_algorithm(lqi_out_float: dict, lqi_in_float: dict) -> str:
 
-    # Prüfung: Wenn keine Dictionaries übergeben wurden
+    # Prüfung: Wurde dict übergeben?
     if not isinstance(lqi_out_float, dict) or not isinstance(lqi_in_float, dict):
         return "-"
 
@@ -247,15 +271,15 @@ def fresh_air_algorithm(lqi_out_float: dict, lqi_in_float: dict) -> str:
     valid_in = [
         v
         for k, v in lqi_in_float.items()
-        if k != "PM10" #PM10 wird ausgeschlossen
-        and isinstance(v, (int, float)) and not math.isnan(v)# schließt None und NaN aus
+        if k != "PM10" # PM10 wird ausgeschlossen
+        and isinstance(v, (int, float)) and not math.isnan(v) # schließt None und NaN aus
     ]
 
     # Prüfung: Mindestens zwei gültige Werte pro Dictionary erforderlich
     if len(valid_out) < 2 or len(valid_in) < 2:
         return "-"
 
-    # Höchsten Einzelwert ermitteln (x für außen, y für innen)
+    # Höchsten float-Einzelwert ermitteln (x für außen, y für innen)
     x_out = max(valid_out)
     y_in = max(valid_in)
 
@@ -264,38 +288,32 @@ def fresh_air_algorithm(lqi_out_float: dict, lqi_in_float: dict) -> str:
 
     # Zonen als Polygone definieren
     zones = [
-        (
-            Polygon([(0, 0), (2, 0), (2, 1.7), (3, 2.7), (2.7, 3), (1.7, 2), (0, 2),]),
-            "Lüften optional",
+        (Polygon([(0, 0), (2, 0), (2, 1.7), (3, 2.7), (2.7, 3), (1.7, 2), (0, 2),]),
+        "Lüften optional",
         ),
-        (
-            Polygon([(2, 0), (3, 0), (3, 2.7), (2, 1.7)]),
-            "Lüften nicht empf.",
+        (Polygon([(2, 0), (3, 0), (3, 2.7), (2, 1.7)]),
+        "Lüften nicht empf.",
         ),
-        (
-            Polygon([(0, 2), (1.7, 2), (2.7, 3), (0, 3)]),
-            "Lüften empfohlen",
+        (Polygon([(0, 2), (1.7, 2), (2.7, 3), (0, 3)]),
+        "Lüften empfohlen",
         ),
-        (
-            Polygon([(2.7, 3), (3, 2.7), (5, 3.3), (5, 5), (3.3, 5)]),
-            "Stoßlüften!",
+        (Polygon([(2.7, 3), (3, 2.7), (5, 3.3), (5, 5), (3.3, 5)]),
+        "Stoßlüften!",
         ),
-        (
-            Polygon([(3, 0), (5, 0), (5, 3.3), (3, 2.7)]),
-            "Nicht lüften!",
+        (Polygon([(3, 0), (5, 0), (5, 3.3), (3, 2.7)]),
+        "Nicht lüften!",
         ),
-        (
-            Polygon([(0, 3), (2.7, 3), (3.3, 5), (0, 5)]),
-            "Dringend lüften!",
+        (Polygon([(0, 3), (2.7, 3), (3.3, 5), (0, 5)]),
+        "Dringend lüften!",
         ),
     ]
 
-    # Prüfen, in welchem Polygon der Punkt liegt
+    # Prüfen, ob und in welchem Polygon der Punkt liegt
     for poly, fresh_air in zones:
         if poly.intersects(coordinate):
             return fresh_air
 
-    # Falls der Punkt unerwartet außerhalb der Polygone liegt
+    # Unerwarteter Fall: Punkt liegt außerhalb der Polygone
     return "-"
 
 # --- CSV-Logger
@@ -314,6 +332,7 @@ CSV_HEADER = [
     "fresh_air",
 ]
 
+# --- Prüfen, ob CSV existiert, wenn nicht neu anlegen
 def csv_init(csv_path):
     if csv_path.exists():
         return
@@ -321,6 +340,7 @@ def csv_init(csv_path):
         writer = csv.DictWriter(f, fieldnames=CSV_HEADER, delimiter=";")
         writer.writeheader()
 
+# --- Neue Zeile mit aktuellen Werten hinzufügen
 def csv_append(csv_path, dashboard_data):
     data_in, data_out, lqi_out, lqi_in, overall, trend, fresh_air, _, lqi_out_float, lqi_in_float = dashboard_data
 
@@ -370,6 +390,7 @@ def csv_append(csv_path, dashboard_data):
         "fresh_air":    fresh_air,
     }
 
+    # Schreiben (append-Modus)
     with csv_path.open("a", encoding="utf-8-sig", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=CSV_HEADER, delimiter=";")
         writer.writerow(row)
