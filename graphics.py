@@ -79,7 +79,7 @@ def draw_static_image(display, vertical_image, draw, fonts):
     draw.text((MID_COLUMN, ROW_1), 'PM2,5', font = fonts['f16'], fill = 0, anchor='ma')
     draw.text((MID_COLUMN, ROW_2), 'PM10', font = fonts['f16'], fill = 0, anchor='ma')
     draw.text((MID_COLUMN-2, ROW_3), 'NO₂', font = fonts['f16'], fill = 0, anchor='ra')
-    draw.text((MID_COLUMN+4, ROW_3), 'NOx', font = fonts['f16'], fill = 0, anchor='la')
+    draw.text((MID_COLUMN+4, ROW_3), 'NOₓ', font = fonts['f16'], fill = 0, anchor='la')
     draw.text((MID_COLUMN-2, ROW_4), 'O₃', font = fonts['f16'], fill = 0, anchor='ra')
     draw.text((MID_COLUMN+4, ROW_4), 'VOC', font = fonts['f16'], fill = 0, anchor='la')
     draw.text((MID_COLUMN-2, ROW_5), 'SO₂', font = fonts['f16'], fill = 0, anchor='ra')

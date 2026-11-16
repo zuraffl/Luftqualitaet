@@ -7,8 +7,8 @@ DISPLAY_INTERVAL = 1 # Minuten, Standard 1, Refresh-Intervall des Dashboards
 # SEN66 Daten
 WARMUP = 60          # Sekunden, Empfehlung 60
 SEN66_TIMEOUT = 5    # Minuten, Standard 5, Bestimmt Gültigkeitsdauer der Daten
-PM2_5_FACTOR = 3.9   # In Messreihe ermittelter Korrekturfaktor 3.9
-PM10_FACTOR = 4.2    # In Messreihe ermittelter Korrekturfaktor 4.2
+PM2_5_FACTOR = 3.2   # In Messreihe ermittelter Korrekturfaktor 3.9
+PM10_FACTOR = 3.45    # In Messreihe ermittelter Korrekturfaktor 4.2
 
 # UBA Daten
 # https://www.umweltbundesamt.de/daten/luft/luftdaten - Karte der Messstationen
